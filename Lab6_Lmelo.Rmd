@@ -1,0 +1,79 @@
+---
+title: "Lab 6"
+author: "Luis Melo & Akash"
+date: "2023-10-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this lab we prepare to evaluate workforce data. Specifically on individuals who choose to work in the public sector.
+We start by loading a couple CSV files that will help identify industry and jobs. 
+To better understand and work with these codes we recode as factors with level value
+
+```{r}
+
+load("~/Desktop/ecob2000_Econometrics/Level 3 Lab/acs2021_ny_data.RData")
+require(plyr)
+require(dplyr)
+require(tidyverse)
+require(haven)
+require(stargazer)
+
+levels_n <- read.csv("IND_levels.csv")
+names(levels_n) <- c("New_Level","levels_orig")
+acs2021$IND <- as.factor(acs2021$IND)
+levels_orig <- levels(acs2021$IND) 
+levels_new <- join(data.frame(levels_orig),data.frame(levels_n))
+
+acs2021$public_work <- acs2021$IND 
+levels_public <- read.csv("publicwork_recode.csv")
+names(levels_public) <- c("levels_orig","New_Level")
+levels_new_pub <- join(data.frame(levels_orig),data.frame(levels_public))
+
+
+levels(acs2021$IND) <- levels_new$New_Level
+levels(acs2021$public_work) <- levels_new_pub$New_Level
+
+```
+
+Before jumping into our intended goal of modeling we are creating a numeric version for our dependent variable of individuals in the public sector. 
+
+```{r}
+
+acs2021$public_work_num <- as.numeric(acs2021$public_work == "work for public, stable")
+
+
+table(acs2021$public_work,acs2021$public_work_num)
+
+```
+
+The above table confirms that the variable has been converted to numeric binary values
+We define "0" as not working in the public sector, with a result of 83236 individuals
+We define "1" as working in the public sector, with a result of 36265 individuals
+
+As we are choosing to model individuals working in the public sector we decide to subset the data to a smaller group.
+This group being Hispanic Women between 25 and 55 in the workforce who have atleast a college degree or advanced degree
+
+
+```{r}
+
+attach(acs2021)
+use_varb <- (AGE >= 25) & (AGE <= 55) & (LABFORCE == 2) & (WKSWORK2 > 4) & (UHRSWORK >= 35) & (Hispanic == 1) & (female == 1) & ((educ_college == 1) | (educ_advdeg == 1))
+dat_use <- subset(acs2021,use_varb) # 
+detach(acs2021)
+
+```
+
+with this subset we estimate that Hispanic women will have a low probability of working in the public sector despite their level of education
+
+```{r} 
+
+ols_out1 <- lm(public_work_num ~ female + educ_hs + educ_somecoll + educ_college + educ_advdeg + AGE, data = acs2021)
+stargazer(ols_out1, type = "text")
+
+```
+
+This model shows that women are less likely to work in the public sector as is despite level of education. However women with advanced degrees are atleast twice as likely to work in the public sector over other levels of education
